@@ -4,14 +4,14 @@ import { login } from "../services/api";
 
 
  export default function Login() {
-    const [operatorName, setOperatorName] = useState("");
+    const [operatorId, setOperatorId] = useState("");
     const navigate = useNavigate();
   
     const handleSubmit = async (e) => {
       e.preventDefault();
-      const result = await login(operatorName);
+      const result = await login(operatorId);
       if (result.message === "הזדהות הצליחה!") {
-        localStorage.setItem("operatorName", operatorName);
+        localStorage.setItem("operatorId", operatorId);
         navigate("/attendance");
       } else {
         alert(result.message);
@@ -25,14 +25,14 @@ import { login } from "../services/api";
             הזדהות מפעיל
           </h1>
           <form onSubmit={handleSubmit}>
-            <label htmlFor="operatorName" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="operatorId" className="block text-sm font-medium text-gray-700">
               שם מפעיל:
             </label>
             <input
               type="text"
-              id="operatorName"
-              value={operatorName}
-              onChange={(e) => setOperatorName(e.target.value)}
+              id="operatorId"
+              value={operatorId}
+              onChange={(e) => setOperatorId(e.target.value)}
               required
               className="w-full mt-2 mb-4 p-2 border rounded-md"
             />

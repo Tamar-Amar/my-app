@@ -1,23 +1,23 @@
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-export async function login(operatorName) {
+export async function login(operatorId) {
   const response = await fetch(`${API_URL}/login`, {
     method: "POST",
-    body: JSON.stringify({ operatorName }),
+    body: JSON.stringify({ operatorId }),
     headers: { "Content-Type": "application/json" },
   });
   return response.json();
 }
 
-export async function fetchSymbols(operatorName) {
-  const response = await fetch(`${API_URL}/symbols?operatorName=${operatorName}`);
+export async function fetchSymbols(operatorId) {
+  const response = await fetch(`${API_URL}/symbols?operatorId=${operatorId}`);
   return response.json();
 }
 
-export async function saveAttendance(operatorName, data) {
+export async function saveAttendance(operatorId, data) {
   const response = await fetch(`${API_URL}/save`, {
     method: "POST",
-    body: JSON.stringify({ operatorName, data }),
+    body: JSON.stringify({ operatorId, data }),
     headers: { "Content-Type": "application/json" },
   });
   return response.json();

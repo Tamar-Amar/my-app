@@ -8,6 +8,7 @@ const app = express();
 const PORT = process.env.PORT||5000;
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID; 
 const ORIGIN_SHEET_NAME = process.env.ORIGIN_SHEET_NAME; 
+const ORIGIN_SHEET_ID = process.env.ORIGIN_SHEET_ID; 
 const EDIT_SHEET_NAME = process.env.EDIT_SHEET_NAME;
 
 app.use(bodyParser.json());
@@ -42,34 +43,35 @@ const auth = new google.auth.GoogleAuth({
 
 
 // Check if operator name exists
-async function isOperatorNameExists(operatorName) {
+async function isOperatorIdExists(operatorId) {
   try {
-    console.log(`Checking if operator exists: ${operatorName}`); // בדיקת הנתון שהתקבל
+    console.log(`Checking if operator ID exists: ${operatorId}`);
     const sheets = google.sheets({ version: 'v4', auth });
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${ORIGIN_SHEET_NAME}!A:A`, // עמודת שמות המפעילים
+      range: `${ORIGIN_SHEET_ID}!A:A`, // עמודה A בלבד
     });
 
-    console.log('Google Sheets API response:', response.data); // הדפסת התגובה מה-API
+    console.log('Google Sheets API response:', response.data);
 
     const rows = response.data.values || [];
-    return rows.flat().includes(operatorName.trim());
+    return rows.flat().includes(operatorId.trim());
   } catch (error) {
-    console.error('Error in isOperatorNameExists:', error); // הדפסת השגיאה לקונסולה
+    console.error('Error in isOperatorIdExists:', error);
     throw error;
   }
 }
 
 
+
 // Login endpoint
 app.post('/login', async (req, res) => {
-  const { operatorName } = req.body;
+  const { operatorId } = req.body;
 
   try {
-    const exists = await isOperatorNameExists(operatorName);
+    const exists = await isOperatorIdExists(operatorId);
     if (!exists) {
-      return res.status(404).json({ message: 'שם המפעיל לא קיים במערכת' });
+      return res.status(404).json({ message: 'תז המפעיל לא קיים במערכת' });
     }
     res.json({ message: 'הזדהות הצליחה!' });
   } catch (error) {
@@ -80,80 +82,117 @@ app.post('/login', async (req, res) => {
 
 // Fetch symbols by operator name
 app.get('/symbols', async (req, res) => {
-  const { operatorName } = req.query;
+  const { operatorId } = req.query;
+  console.log("operatorId", operatorId);
 
   try {
-      const sheets = google.sheets({ version: 'v4', auth });
-      const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${ORIGIN_SHEET_NAME}!A:D`, // עמודות A עד D
-      });
+    console.log(`Fetching symbols for operator ID: ${operatorId}`);
 
-      const rows = response.data.values || [];
-      const symbols = rows.filter(row => row[0]?.trim() === operatorName.trim());
+    // בדוק אם תעודת הזהות קיימת
+    const operatorExists = await isOperatorIdExists(operatorId);
+    if (!operatorExists) {
+      return res.status(404).json({ message: 'תעודת הזהות לא קיימת במערכת' });
+    }
 
-      if (symbols.length === 0) {
-          return res.status(404).json({ message: 'לא נמצאו סמלים עבור המפעיל' });
-      }
+    // קבל את שם המפעיל
+    const operatorName = await returnNameById(operatorId); // יש להשתמש ב-await כאן
+    console.log(`Operator name: ${operatorName}`);
 
-      res.json({ symbols });
+    // שלוף סמלים מתוך ORIGIN_SHEET_NAME
+    const sheets = google.sheets({ version: 'v4', auth });
+    const symbolSheetResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${ORIGIN_SHEET_NAME}!A:Z`, // כל העמודות
+    });
+
+    const symbolRows = symbolSheetResponse.data.values || [];
+    const symbols = symbolRows.filter(row => row[0]?.trim() === operatorName);
+
+    if (symbols.length === 0) {
+      return res.status(404).json({ message: 'לא נמצאו סמלים עבור המפעיל' });
+    }
+
+    res.json({ symbols });
   } catch (error) {
-      console.error('שגיאה בשליפת סמלים:', error);
-      res.status(500).json({ message: 'שגיאה בשליפת סמלים' });
+    console.error('שגיאה בשליפת סמלים:', error);
+    res.status(500).json({ message: 'שגיאה בשליפת סמלים' });
   }
 });
+
+
+
+const returnNameById = async (operatorId) => {
+  console.log(`Returning name for operator ID: ${operatorId}`);
+  // שלוף את שם המפעיל מתוך ORIGIN_SHEET_ID
+  const sheets = google.sheets({ version: 'v4', auth });
+  const idSheetResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${ORIGIN_SHEET_ID}!A:B`,
+  });
+  const idRows = idSheetResponse.data.values || [];
+  const operatorRow = idRows.find(row => row[0]?.trim() === operatorId.trim());
+  if (!operatorRow) {
+    return res.status(404).json({ message: 'תעודת הזהות לא נמצאה בגיליון' });
+  }
+  const operatorName = operatorRow[1]?.trim();
+  console.log(`Operator name: ${operatorName}`);
+  return operatorName;
+};
+
 
 // Save attendance data
 app.post('/save', async (req, res) => {
-  const { operatorName, data } = req.body;
-  console.log('Data received:', data);
+  const { operatorId, data } = req.body;
 
   try {
-      const sheets = google.sheets({ version: 'v4', auth });
-      const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${EDIT_SHEET_NAME}!A:Z`,
-      });
-      const rows = response.data.values || [];
-      const dataRows = rows.slice(1);
+    // קבל את שם המפעיל
+    const operatorName = await returnNameById(operatorId); // יש להשתמש ב-await כאן
+    console.log(`Saving data for operator name: ${operatorName}`);
 
-      for (const [key, value] of data) { // שימי לב שפה מדובר במערך
-        console.log('Processing key:', key, 'value:', value);
-      
-        const symbolId = key; // המפתח במערך שלך הוא ה-symbolId
-        const { checked, day } = value;
-      
-        if (checked) {
-          const matchingRow = dataRows.find(row => row[0] === symbolId);
-          if (matchingRow) {
-            const rowIndex = dataRows.indexOf(matchingRow) + 2;
-            const weeksColumns = ['F', 'H', 'J', 'L', 'N'];
-      
-            for (const column of weeksColumns) {
-              const cell = `${EDIT_SHEET_NAME}!${column}${rowIndex}`;
-              await sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range: cell,
-                valueInputOption: 'RAW',
-                resource: {
-                  values: [[operatorName]],
-                },
-              });
-            }
-          } else {
-            console.log(`לא נמצאה שורה מתאימה לסמל ${symbolId}`);
+    const sheets = google.sheets({ version: 'v4', auth });
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${EDIT_SHEET_NAME}!A:Z`,
+    });
+    const rows = response.data.values || [];
+    const dataRows = rows.slice(1);
+
+    for (const [key, value] of data) {
+      console.log('Processing key:', key, 'value:', value);
+
+      const symbolId = key;
+      const { checked, day } = value;
+
+      if (checked) {
+        const matchingRow = dataRows.find(row => row[0] === symbolId);
+        if (matchingRow) {
+          const rowIndex = dataRows.indexOf(matchingRow) + 2;
+          const weeksColumns = ['F', 'H', 'J', 'L', 'N'];
+
+          for (const column of weeksColumns) {
+            const cell = `${EDIT_SHEET_NAME}!${column}${rowIndex}`;
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: cell,
+              valueInputOption: 'RAW',
+              resource: {
+                values: [[operatorName]],
+              },
+            });
           }
+        } else {
+          console.log(`לא נמצאה שורה מתאימה לסמל ${symbolId}`);
         }
       }
-      
-      
+    }
 
-      res.json({ message: 'הנתונים נשמרו בהצלחה!' });
+    res.json({ message: 'הנתונים נשמרו בהצלחה!' });
   } catch (error) {
-      console.error('שגיאה בשמירת הנתונים:', error);
-      res.status(500).json({ message: 'שגיאה בשמירת הנתונים' });
+    console.error('שגיאה בשמירת הנתונים:', error);
+    res.status(500).json({ message: 'שגיאה בשמירת הנתונים' });
   }
 });
+
 
 
 
