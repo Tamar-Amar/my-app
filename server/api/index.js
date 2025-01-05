@@ -14,6 +14,7 @@ app.use(bodyParser.json());
 
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:3001',
   'https://my-app-client-liart.vercel.app'
 ];
 
@@ -38,32 +39,41 @@ const auth = new google.auth.GoogleAuth({
 // Check if operator name exists
 async function isOperatorNameExists(operatorName) {
   try {
+    console.log(`Checking if operator exists: ${operatorName}`); // בדיקת הנתון שהתקבל
     const sheets = google.sheets({ version: 'v4', auth });
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: `${ORIGIN_SHEET_NAME}!A:A`, // עמודת שמות המפעילים
     });
 
+    console.log('Google Sheets API response:', response.data); // הדפסת התגובה מה-API
+
     const rows = response.data.values || [];
     return rows.flat().includes(operatorName.trim());
   } catch (error) {
-    console.error('Error checking operator name:', error);
+    console.error('Error in isOperatorNameExists:', error); // הדפסת השגיאה לקונסולה
     throw error;
   }
 }
+
 
 // Login endpoint
 app.post('/login', async (req, res) => {
   const { operatorName } = req.body;
 
+  console.log(`Received login request for operator: ${operatorName}`); // בדיקת הנתון שהתקבל
+
   try {
     const exists = await isOperatorNameExists(operatorName);
+    console.log(`Operator exists: ${exists}`); // הדפסת התוצאה מהפונקציה
+
     if (!exists) {
       return res.status(404).json({ message: 'שם המפעיל לא קיים במערכת' });
     }
 
     res.json({ message: 'הזדהות הצליחה!' });
   } catch (error) {
+    console.error('Error in /login:', error); // הדפסת השגיאה לקונסולה
     res.status(500).json({ message: 'שגיאה בעת בדיקת שם המפעיל' });
   }
 });
