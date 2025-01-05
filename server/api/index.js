@@ -190,6 +190,10 @@ app.post('/generate-pdf', async (req, res) => {
 
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+if (process.env.VERCEL_ENV) {
+  module.exports = app; 
+} else {
+  app.listen(PORT, () => {
+    console.log(`Server running locally on http://localhost:${PORT}`);
+  });
+}
