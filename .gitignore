@@ -1,0 +1,31 @@
+credentials.json
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+
+# Logs
+logs/
+*.log
+debug.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build files
+build/
+dist/
+.next/
+.nuxt/
+
+.env.local
+.env.development
+.env.production
+
+client/build/
+server/dist/
+
