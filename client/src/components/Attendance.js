@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { fetchSymbols, saveAttendance } from "../services/api";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 export default function Attendance() {
   const [symbols, setSymbols] = useState([]);
-  const [formData, setFormData] = useState({}); // נתונים מטבלה
+  const [formData, setFormData] = useState({}); 
   const operatorName = localStorage.getItem("operatorName") || "משתמש";
 
   useEffect(() => {
@@ -18,7 +19,7 @@ export default function Attendance() {
     loadSymbols();
   }, [operatorName]);
 
-  // עדכון נתונים בטבלה
+  
   const handleInputChange = (symbolId, field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -42,6 +43,7 @@ export default function Attendance() {
       console.error("שגיאה בעת שמירת הנתונים:", error);
     }
   };
+  
 
   const handleDownloadPDF = async () => {
     const filteredData = Object.entries(formData)
@@ -51,8 +53,7 @@ export default function Attendance() {
         name: symbols.find((symbol) => symbol[1] === symbolId)?.[2] || "", // הוספת שם מוסד
         day: data.day || "לא נבחר",
       }));
-  
-    const response = await fetch(`http://localhost:5000/generate-pdf`, {
+    const response = await fetch(`${API_URL}/generate-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ operatorName, data: filteredData }),
@@ -68,7 +69,6 @@ export default function Attendance() {
   };
   
   
-
   return (
     <div className="flex flex-col items-center bg-gray-100 min-h-screen py-10">
       <h1 className="text-3xl font-bold text-blue-700 mb-6">דיווח חודשי</h1>

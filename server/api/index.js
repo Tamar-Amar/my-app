@@ -32,9 +32,14 @@ app.use(cors({
 
 // Google Sheets API Configuration
 const auth = new google.auth.GoogleAuth({
-  keyFile: 'credentials.json', 
+  credentials: {
+    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+  },
+  projectId: process.env.GOOGLE_PROJECT_ID,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
+
 
 // Check if operator name exists
 async function isOperatorNameExists(operatorName) {
@@ -61,19 +66,14 @@ async function isOperatorNameExists(operatorName) {
 app.post('/login', async (req, res) => {
   const { operatorName } = req.body;
 
-  console.log(`Received login request for operator: ${operatorName}`); // בדיקת הנתון שהתקבל
-
   try {
     const exists = await isOperatorNameExists(operatorName);
-    console.log(`Operator exists: ${exists}`); // הדפסת התוצאה מהפונקציה
-
     if (!exists) {
       return res.status(404).json({ message: 'שם המפעיל לא קיים במערכת' });
     }
-
     res.json({ message: 'הזדהות הצליחה!' });
   } catch (error) {
-    console.error('Error in /login:', error); // הדפסת השגיאה לקונסולה
+    console.error('Error in /login:', error);
     res.status(500).json({ message: 'שגיאה בעת בדיקת שם המפעיל' });
   }
 });
@@ -106,6 +106,7 @@ app.get('/symbols', async (req, res) => {
 // Save attendance data
 app.post('/save', async (req, res) => {
   const { operatorName, data } = req.body;
+  console.log('Data received:', data);
 
   try {
       const sheets = google.sheets({ version: 'v4', auth });
@@ -116,36 +117,35 @@ app.post('/save', async (req, res) => {
       const rows = response.data.values || [];
       const dataRows = rows.slice(1);
 
-      for (const [key, value] of Object.entries(data)) {
-          if (key.startsWith('weekly_') && value === 'on') {
-              const symbolId = key.split('_')[1]; 
-              const matchingRow = dataRows.find(row => row[0] === symbolId);
+      for (const [key, value] of data) { // שימי לב שפה מדובר במערך
+        console.log('Processing key:', key, 'value:', value);
       
-              if (matchingRow) {
-                  const rowIndex = dataRows.indexOf(matchingRow) + 2; 
-                  const weeksColumns = ['F', 'H', 'J', 'L', 'N']; 
+        const symbolId = key; // המפתח במערך שלך הוא ה-symbolId
+        const { checked, day } = value;
       
-                  for (const column of weeksColumns) {
-                      const cell = `${EDIT_SHEET_NAME}!${column}${rowIndex}`;
-                      try {
-                          await sheets.spreadsheets.values.update({
-                              spreadsheetId: SPREADSHEET_ID,
-                              range: cell,
-                              valueInputOption: 'RAW',
-                              resource: {
-                                  values: [[operatorName]],
-                              },
-                          });
-                          console.log(`הנתונים עודכנו בהצלחה ב-${cell}`);
-                      } catch (updateError) {
-                          console.error(`שגיאה בעת עדכון ${cell}:`, updateError);
-                      }
-                  }
-              } else {
-                  console.log(`לא נמצאה שורה מתאימה לסמל ${symbolId}`);
-              }
+        if (checked) {
+          const matchingRow = dataRows.find(row => row[0] === symbolId);
+          if (matchingRow) {
+            const rowIndex = dataRows.indexOf(matchingRow) + 2;
+            const weeksColumns = ['F', 'H', 'J', 'L', 'N'];
+      
+            for (const column of weeksColumns) {
+              const cell = `${EDIT_SHEET_NAME}!${column}${rowIndex}`;
+              await sheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: cell,
+                valueInputOption: 'RAW',
+                resource: {
+                  values: [[operatorName]],
+                },
+              });
+            }
+          } else {
+            console.log(`לא נמצאה שורה מתאימה לסמל ${symbolId}`);
           }
+        }
       }
+      
       
 
       res.json({ message: 'הנתונים נשמרו בהצלחה!' });
@@ -154,6 +154,8 @@ app.post('/save', async (req, res) => {
       res.status(500).json({ message: 'שגיאה בשמירת הנתונים' });
   }
 });
+
+
 
 const PDFDocument = require('pdfkit');
 const path = require('path');
@@ -168,7 +170,7 @@ app.post('/generate-pdf', async (req, res) => {
     }
 
     const doc = new PDFDocument({ lang: 'he', margin: 50 });
-    const fontPath = path.join(__dirname, 'fonts', 'Alef-Regular.ttf');
+    const fontPath = path.join(__dirname, '../fonts/Alef-Regular.ttf');
     doc.font(fontPath);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=attendance_report.pdf');
@@ -209,7 +211,9 @@ app.post('/generate-pdf', async (req, res) => {
     console.error('שגיאה ביצירת PDF:', error);
     res.status(500).json({ message: 'שגיאה ביצירת PDF' });
   }
-});app.get('/', (req, res) => {
+});
+
+app.get('/', (req, res) => {
   res.send('Welcome to the API server!');
 });
 
