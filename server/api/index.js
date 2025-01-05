@@ -2,9 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const { google } = require('googleapis');
+require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT||5000;
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID; 
 const ORIGIN_SHEET_NAME = process.env.ORIGIN_SHEET_NAME; 
 const EDIT_SHEET_NAME = process.env.EDIT_SHEET_NAME;
