@@ -184,7 +184,10 @@ app.post('/generate-pdf', async (req, res) => {
     console.error('שגיאה ביצירת PDF:', error);
     res.status(500).json({ message: 'שגיאה ביצירת PDF' });
   }
+});app.get('/', (req, res) => {
+  res.send('Welcome to the API server!');
 });
+
 
 // Start server
 app.listen(PORT, () => {
