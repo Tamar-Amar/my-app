@@ -10,9 +10,24 @@ const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 const ORIGIN_SHEET_NAME = process.env.ORIGIN_SHEET_NAME; 
 const EDIT_SHEET_NAME = process.env.EDIT_SHEET_NAME;
 
-// Middleware
-app.use(cors());
 app.use(bodyParser.json());
+
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://my-app-client-liart.vercel.app'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
 
 // Google Sheets API Configuration
 const auth = new google.auth.GoogleAuth({
